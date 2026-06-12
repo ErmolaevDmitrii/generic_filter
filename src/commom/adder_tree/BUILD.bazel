@@ -1,0 +1,41 @@
+load("//tools/bazel:sv_rules.bzl", "sv_jinja_inline_template", "sv_library")
+
+package(default_visibility = ["//visibility:public"])
+
+BASE_CONFIG = {
+    "MODULE_NAME": "generic",
+    "INPUT_COUNT": "8",
+    "DATA_WIDTH": "32",
+    "FIXED_LAYER_DATA_WIDTH": "false",
+    "ADDER_MODE": "COMB",
+    "HAS_RESET": "false",
+    "HAS_ENABLE": "true",
+    "HAS_DATA_VALIDITY": "true",
+    "START_OUTPUT_LAYER": "1",
+    "TARGET": "VERIFICATION",
+    "CUSTOM_EN": "false",
+}
+
+sv_jinja_inline_template(
+    name = "generic_adder_wrapper",
+    template = "src/adder_wrapper.sv.j2",
+    config = BASE_CONFIG,
+    deps = ["//tools/jinja2:jinja2_utils"],
+    out = "generic_adder_wrapper.sv",
+)
+
+sv_jinja_inline_template(
+    name = "generic_adder_tree",
+    template = "src/adder_tree.sv.j2",
+    config = BASE_CONFIG,
+    deps = ["//tools/jinja2:jinja2_utils"],
+    out = "generic_adder_tree.sv",
+)
+
+sv_library(
+    name = "rtl",
+    deps = [
+        ":generic_adder_wrapper",
+        ":generic_adder_tree",
+    ],
+)

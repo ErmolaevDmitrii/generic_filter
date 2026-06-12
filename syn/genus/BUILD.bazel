@@ -1,0 +1,39 @@
+load("//tools/bazel:syn_rules.bzl", "genus_package")
+
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "genus_scripts",
+    srcs = [
+        "scripts/genus_physical_synth.tcl",
+        "scripts/run_genus.sh",
+    ],
+)
+
+genus_package(
+    name = "fp_rd_tt_package",
+    corner = "tt",
+    top_module = "generic_fp_rd",
+    rtl_deps = [
+        "//src/filters/fp-rd:rtl",
+    ],
+    liberty = [
+        "//syn/pdks:ics55_tt_liberty",
+    ],
+    lefs = [
+        "//syn/pdks:ics55_tt_lefs",
+    ],
+    verilog_models = [
+        "//syn/pdks:ics55_tt_verilog_models",
+    ],
+    cdl_netlists = [
+        "//syn/pdks:ics55_tt_cdl_netlists",
+    ],
+    gds = [
+        "//syn/pdks:ics55_tt_gds",
+    ],
+    scripts = [
+        ":genus_scripts",
+    ],
+    out = "fp_rd_tt_genus_pkg.tar.gz",
+)

@@ -1,0 +1,148 @@
+{% from "tools/jinja2/rtl_header.j2" import rtl_header %}
+{% from "tools/jinja2/parameters_dump.j2" import parameters_dump %}
+
+{{ parameters_dump(ctx) }}
+
+{{ rtl_header(
+    module_name = MODULE_NAME ~ "_adder_tree",
+    description = "Top module for parametrized adder tree",
+    authors     = "Dmitrii Ermolaev"
+) }}
+
+{{ jinja_warning("TODO: Implement parameter check") }}
+{{ jinja_warning("TODO: add module package to return output parameters") }}
+
+{{ jinja_assert(INPUT_COUNT is defined, "INPUT_COUNT is not defined") }}
+{{ jinja_assert(INPUT_COUNT is integer, "INPUT_COUNT must be integer") }}
+{{ jinja_assert(INPUT_COUNT > 0, "INPUT_COUNT must be 1 or greater") }}
+{{ jinja_assert(INPUT_COUNT == 2 ** (INPUT_COUNT | clog2), "INPUT_COUNT must be a power of two") }}
+
+`ifndef {{MODULE_NAME | upper}}_ADDER_TREE
+
+`define {{MODULE_NAME | upper}}_ADDER_TREE
+
+{% set layers_info = namespace(
+    layer_count        = INPUT_COUNT | clog2,
+    layer_adder_count  = [],
+    layer_input_width  = [],
+    layer_output_width = []
+) %}
+
+{% for i in range(layers_info.layer_count - 1, -1, -1) %}
+    {% if loop.first or FIXED_LAYER_DATA_WIDTH %}
+        {% do layers_info.layer_input_width.append(DATA_WIDTH) %}
+    {% else %}
+        {% do layers_info.layer_input_width.append(layers_info.layer_output_width | last) %}
+    {% endif %}
+
+    {% if FIXED_LAYER_DATA_WIDTH %}
+        {% do layers_info.layer_output_width.append(DATA_WIDTH) %}
+    {% else %}
+        {% do layers_info.layer_output_width.append(layers_info.layer_input_width | last + 1) %}
+    {% endif %}
+
+    {% do layers_info.layer_adder_count.append(2**i) %}
+{% endfor %}
+
+module {{MODULE_NAME}}_adder_tree
+#(
+    localparam int unsigned INPUT_COUNT  = {{ INPUT_COUNT             }},
+    localparam int unsigned DATA_WIDTH   = {{ DATA_WIDTH              }},
+    localparam int unsigned LAYER_COUNT  = {{ layers_info.layer_count }}
+)
+(
+    {% if ADDER_MODE == "PIPELINED" %}
+      input logic clk,
+        {% if HAS_RESET %}
+      input logic rst_n,
+        {% endif %}
+    {% endif %}
+
+    {% if HAS_ENABLE %}
+      input logic layer_en_i [LAYER_COUNT],
+    {% endif %}
+
+      input logic signed [DATA_WIDTH - 1:0] data_i   [INPUT_COUNT]
+    {% if HAS_DATA_VALIDITY %}
+    , input logic                           data_v_i [INPUT_COUNT]
+    {% endif %}
+
+    {% for i in range(START_OUTPUT_LAYER - 1, layers_info.layer_count) %}
+    , output logic signed [{{layers_info.layer_output_width[i] - 1}}:0] data_layer_{{i}}_o   [{{layers_info.layer_adder_count[i]}}]
+        {% if HAS_DATA_VALIDITY %}
+    , output logic                                                      data_layer_{{i}}_v_o [{{layers_info.layer_adder_count[i]}}]
+        {% endif %}
+    {% endfor %}
+);
+
+{% for i in range(layers_info.layer_count) %}
+logic signed [{{layers_info.layer_input_width[i] - 1}}:0] layer_{{i}}_data_inputs     [{{layers_info.layer_adder_count[i] * 2}}];
+{% if HAS_DATA_VALIDITY %}
+logic                                                     layer_{{i}}_data_inputs_v   [{{layers_info.layer_adder_count[i] * 2}}];
+{% endif %}
+
+logic signed [{{layers_info.layer_output_width[i] - 1}}:0] layer_{{i}}_data_outputs   [{{layers_info.layer_adder_count[i]}}];
+{% if HAS_DATA_VALIDITY %}
+logic                                                      layer_{{i}}_data_outputs_v [{{layers_info.layer_adder_count[i]}}];
+{% endif %}
+{% endfor %}
+
+assign layer_0_data_inputs   = data_i;
+{% if HAS_DATA_VALIDITY %}
+assign layer_0_data_inputs_v = data_v_i;
+{% endif %}
+
+{% for layer_ii in range(layers_info.layer_count) %}
+    {% for adder_ii in range(layers_info.layer_adder_count[layer_ii]) %}
+
+{{MODULE_NAME}}_adder_wrapper # (
+    .INPUT_WIDTH  ({{layers_info.layer_input_width [layer_ii]}}),
+    .OUTPUT_WIDTH ({{layers_info.layer_output_width[layer_ii]}})
+)
+i_layer_{{layer_ii}}_adder_{{adder_ii}}
+(
+    {% if ADDER_MODE == "PIPELINED" %}
+      .clk  (clk),
+        {% if HAS_RESET %}
+      .rst_n(rst_n),
+        {% endif %}
+    {% endif %}
+    {% if HAS_ENABLE %}
+      .en_i (layer_en_i[{{layer_ii}}]),
+    {% endif %}
+
+      .operand_1_i  (layer_{{layer_ii}}_data_inputs  [{{adder_ii * 2}}])
+    {% if HAS_DATA_VALIDITY %}
+    , .operand_1_v_i(layer_{{layer_ii}}_data_inputs_v[{{adder_ii * 2}}])
+    {% endif %}
+    , .operand_2_i  (layer_{{layer_ii}}_data_inputs  [{{adder_ii * 2 + 1}}])
+    {% if HAS_DATA_VALIDITY %}
+    , .operand_2_v_i(layer_{{layer_ii}}_data_inputs_v[{{adder_ii * 2 + 1}}])
+    {% endif %}
+
+    , .result_o  (layer_{{layer_ii}}_data_outputs  [{{adder_ii}}])
+    {% if HAS_DATA_VALIDITY %}
+    , .result_v_o(layer_{{layer_ii}}_data_outputs_v[{{adder_ii}}])
+    {% endif %}
+);
+    {% endfor %}
+
+{% if not loop.last %}
+assign layer_{{layer_ii + 1}}_data_inputs   = layer_{{layer_ii}}_data_outputs;
+    {% if HAS_DATA_VALIDITY %}
+assign layer_{{layer_ii + 1}}_data_inputs_v = layer_{{layer_ii}}_data_outputs_v;
+    {% endif %}
+{% endif %}
+
+{% endfor %}
+
+{% for layer_ii in range(START_OUTPUT_LAYER - 1, layers_info.layer_count) %}
+assign data_layer_{{layer_ii}}_o   = layer_{{layer_ii}}_data_outputs;
+{% if HAS_DATA_VALIDITY %}
+assign data_layer_{{layer_ii}}_v_o = layer_{{layer_ii}}_data_outputs_v;
+{% endif %}
+{% endfor %}
+
+endmodule
+
+`endif // {{MODULE_NAME | upper}}_ADDER_TREE

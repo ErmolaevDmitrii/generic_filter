@@ -1,0 +1,9 @@
+alias(
+    name = "rtl",
+    actual = "//src:rtl",
+)
+
+alias(
+    name = "rtl_filelist",
+    actual = "//src:filelist",
+)

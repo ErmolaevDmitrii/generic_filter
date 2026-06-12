@@ -1,0 +1,140 @@
+{% from "tools/jinja2/rtl_header.j2" import rtl_header %}
+{% from "tools/jinja2/parameters_dump.j2" import parameters_dump %}
+
+{{ parameters_dump(ctx) }}
+
+{{ rtl_header(
+    module_name = MODULE_NAME ~ "_multiplier_layer",
+    description = "Top module for parametrized multiplier layer",
+    authors     = "Dmitrii Ermolaev"
+) }}
+
+`ifndef {{MODULE_NAME | upper}}_MULTIPLIER_LAYER
+
+`define {{MODULE_NAME | upper}}_MULTIPLIER_LAYER
+
+module {{MODULE_NAME}}_multiplier_layer
+  import {{MODULE_NAME}}_multiplier_layer_pkg::*;
+(
+    {% if MUL_MODE == "PIPELINED" or COEFF_TYPE == "DYNAMIC" %}
+      input logic clk,
+        {% if HAS_RESET %}
+      input logic rst_n,
+        {% endif %}
+    {% endif %}
+
+    {% if HAS_ENABLE %}
+      input logic en_i,
+    {% endif %}
+
+      input logic signed [INPUT_DATA_WIDTH - 1:0] data_i   [TAPS_COUNT]
+    {% if HAS_DATA_VALIDITY %}
+    , input logic                                 data_v_i [TAPS_COUNT]
+    {% endif %}
+
+    {% if COEFF_TYPE == "DYNAMIC" %}
+    , input logic  [COEFFS_INDEX_WIDTH - 1:0] coeff_update_index_i
+    , input logic signed [COEFFS_WIDTH - 1:0] coeff_update_data_i
+    , input logic                             coeff_update_v_i
+        {% if HAS_SHADOW_REGISTERS %}
+    , input logic                             coeffs_commit_i
+        {% endif %}
+    {% endif %}
+
+    {% if HAS_COEFFS_OPTIONS %}
+        {% for i in range(COEFFS_OPTIONS_COUNT) %}
+    , input logic signed [COEFFS_WIDTH - 1:0] coeffs_option_{{i}}_i [TAPS_COUNT]
+        {% endfor %}
+    , input logic    [COEFFS_OPTIONS_SEL_WIDTH - 1:0] coeff_sel_i
+    {% endif %}
+
+    , output logic signed [OUTPUT_DATA_WIDTH - 1:0] data_o   [TAPS_COUNT]
+    {% if HAS_DATA_VALIDITY %}
+    , output logic                                  data_v_o [TAPS_COUNT]
+    {% endif %}
+
+    {% if HAS_COEFFS_OUTPUT %}
+    , output logic signed [COEFFS_WIDTH - 1:0] coeffs_o [TAPS_COUNT]
+    {% endif %}
+);
+
+logic signed [COEFFS_WIDTH - 1:0] selected_coeffs [TAPS_COUNT];
+logic signed [COEFFS_WIDTH - 1:0] internal_coeffs [TAPS_COUNT];
+
+{% if HAS_COEFFS_OPTIONS %}
+{{MODULE_NAME}}_coeffs_selector
+i_coeffs_selector
+(
+      .coeffs_option_0_i(internal_coeffs),
+    {% for i in range(1, COEFFS_OPTIONS_COUNT + 1) %}
+      .coeffs_option_{{i}}_i(coeffs_option_{{i - 1}}_i),
+    {% endfor %}
+      .coeffs_sel_i(coeff_sel_i)
+    , .coeffs_o    (selected_coeffs)
+);
+{% else %}
+assign selected_coeffs = internal_coeffs;
+{% endif %}
+
+{{MODULE_NAME}}_register_file
+i_register_file
+(
+    {% if COEFF_TYPE == "DYNAMIC" %}
+      .clk(clk),
+        {% if HAS_RESET %}
+      .rst_n(rst_n),
+        {% endif %}
+    {% endif %}
+    {% if COEFF_TYPE == "DYNAMIC" %}
+      .coeff_update_index_i(coeff_update_index_i),
+      .coeff_update_data_i (coeff_update_data_i),
+      .coeff_update_v_i    (coeff_update_v_i),
+        {% if HAS_SHADOW_REGISTERS %}
+      .coeffs_commit_i(coeffs_commit_i),
+        {% endif %}
+    {% endif %}
+    {% if HAS_ENABLE %}
+      .en_i(en_i),
+    {% endif %}
+
+      .coeffs_o(internal_coeffs)
+);
+
+{% if HAS_COEFFS_OUTPUT %}
+assign coeffs_o = internal_coeffs;
+{% endif %}
+
+{% for i in range(TAPS_COUNT) %}
+{{MODULE_NAME}}_multiplier_wrapper
+i_multiplier_{{i}}
+(
+    {% if MUL_MODE == "PIPELINED" %}
+      .clk  (clk),
+        {% if HAS_RESET %}
+      .rst_n(rst_n),
+        {% endif %}
+    {% endif %}
+    {% if HAS_ENABLE %}
+      .en_i (en_i),
+    {% endif %}
+
+      .operand_1_i  (data_i  [{{i}}])
+    {% if HAS_DATA_VALIDITY %}
+    , .operand_1_v_i(data_v_i[{{i}}])
+    {% endif %}
+    , .operand_2_i(selected_coeffs[{{i}}])
+    {% if HAS_DATA_VALIDITY %}
+    , .operand_2_v_i(1'b1)
+    {% endif %}
+
+    , .result_o  (data_o  [{{i}}])
+    {% if HAS_DATA_VALIDITY %}
+    , .result_v_o(data_v_o[{{i}}])
+    {% endif %}
+);
+
+{% endfor %}
+
+endmodule
+
+`endif // {{MODULE_NAME | upper}}_MULTIPLIER_LAYER

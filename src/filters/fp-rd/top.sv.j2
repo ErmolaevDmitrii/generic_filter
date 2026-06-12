@@ -1,0 +1,170 @@
+{% from "tools/jinja2/rtl_header.j2" import rtl_header %}
+{% from "tools/jinja2/parameters_dump.j2" import parameters_dump %}
+
+{{ parameters_dump(ctx) }}
+
+{{ rtl_header(
+    module_name = MODULE_NAME,
+    description = "Top module for fp-rd FIR filter design",
+    authors     = "Dmitrii Ermolaev"
+) }}
+
+{{ jinja_assert(TAPS_COUNT is defined, "TAPS_COUNT is not defined") }}
+{{ jinja_assert(TAPS_COUNT is integer, "TAPS_COUNT must be integer") }}
+{{ jinja_assert(TAPS_COUNT > 0, "TAPS_COUNT must be 1 or greater") }}
+{{ jinja_assert(TAPS_COUNT == 2 ** (TAPS_COUNT | clog2), "TAPS_COUNT must be a power of two") }}
+
+{{ jinja_assert(INPUT_DATA_WIDTH is defined, "INPUT_DATA_WIDTH is not defined") }}
+{{ jinja_assert(INPUT_DATA_WIDTH is integer, "INPUT_DATA_WIDTH must be integer") }}
+{{ jinja_assert(INPUT_DATA_WIDTH > 0, "INPUT_DATA_WIDTH must be 1 or greater") }}
+
+{{ jinja_assert(MUL_OUTPUT_DATA_WIDTH is defined, "MUL_OUTPUT_DATA_WIDTH is not defined") }}
+{{ jinja_assert(MUL_OUTPUT_DATA_WIDTH is integer, "MUL_OUTPUT_DATA_WIDTH must be integer") }}
+{{ jinja_assert(MUL_OUTPUT_DATA_WIDTH > 0, "MUL_OUTPUT_DATA_WIDTH must be 1 or greater") }}
+
+{% set adder_layer_count = TAPS_COUNT | clog2 %}
+{% set output_data_width = MUL_OUTPUT_DATA_WIDTH + adder_layer_count %}
+
+`ifndef {{MODULE_NAME | upper}}_TOP
+
+`define {{MODULE_NAME | upper}}_TOP
+
+module {{MODULE_NAME}}
+#(
+    localparam int unsigned TAPS_COUNT            = {{ TAPS_COUNT }},
+    localparam int unsigned INPUT_DATA_WIDTH      = {{ INPUT_DATA_WIDTH }},
+    localparam int unsigned COEFFS_WIDTH          = {{ COEFFS_WIDTH }},
+    localparam int unsigned MUL_OUTPUT_DATA_WIDTH = {{ MUL_OUTPUT_DATA_WIDTH }},
+    localparam int unsigned OUTPUT_DATA_WIDTH     = {{ output_data_width }}
+)
+(
+      input logic clk
+    {% if HAS_RESET %}
+    , input logic rst_n
+    {% endif %}
+    {% if HAS_ENABLE %}
+    , input logic en_i
+    {% endif %}
+
+    , input logic signed [INPUT_DATA_WIDTH - 1:0] data_i
+    {% if HAS_DATA_VALIDITY %}
+    , input logic                                 data_v_i
+    {% endif %}
+
+    , output logic signed [OUTPUT_DATA_WIDTH - 1:0] data_o
+    {% if HAS_DATA_VALIDITY %}
+    , output logic                                      data_v_o
+    {% endif %}
+
+    {% if HAS_COEFFS_OUTPUT %}
+    , output logic signed [COEFFS_WIDTH - 1:0] coeffs_o [TAPS_COUNT]
+    {% endif %}
+);
+
+logic [INPUT_DATA_WIDTH - 1:0] delay_taps_data   [TAPS_COUNT];
+{% if HAS_DATA_VALIDITY %}
+logic                          delay_taps_data_v [TAPS_COUNT];
+{% endif %}
+
+logic signed [INPUT_DATA_WIDTH - 1:0] multiplier_data_i [TAPS_COUNT];
+logic signed [MUL_OUTPUT_DATA_WIDTH - 1:0] products     [TAPS_COUNT];
+{% if HAS_DATA_VALIDITY %}
+logic                                      products_v   [TAPS_COUNT];
+{% endif %}
+
+logic adder_layer_en [{{adder_layer_count}}];
+
+{% for layer_ii in range(adder_layer_count) %}
+logic signed [{{MUL_OUTPUT_DATA_WIDTH + layer_ii}}:0] adder_layer_{{layer_ii}}_data   [{{2 ** (adder_layer_count - layer_ii - 1)}}];
+{% if HAS_DATA_VALIDITY %}
+logic                                                adder_layer_{{layer_ii}}_data_v [{{2 ** (adder_layer_count - layer_ii - 1)}}];
+{% endif %}
+{% endfor %}
+
+{% for i in range(TAPS_COUNT) %}
+assign multiplier_data_i[{{i}}] = delay_taps_data[{{i}}];
+{% endfor %}
+
+{% for layer_ii in range(adder_layer_count) %}
+assign adder_layer_en[{{layer_ii}}] = {{"en_i" if HAS_ENABLE else "1'b1"}};
+{% endfor %}
+
+{{DELAY_LINE_MODULE_NAME}}
+i_delay_line
+(
+      .clk          (clk)
+    {% if HAS_RESET %}
+    , .rst_n        (rst_n)
+    {% endif %}
+    {% if HAS_ENABLE %}
+    , .en_i         (en_i)
+    {% endif %}
+
+    , .data_i       (data_i)
+    {% if HAS_DATA_VALIDITY %}
+    , .data_v_i     (data_v_i)
+    {% endif %}
+
+    , .bypass_i     ('0)
+
+    , .data_o       ()
+    {% if HAS_DATA_VALIDITY %}
+    , .data_v_o     ()
+    {% endif %}
+
+    , .taps_data_o  (delay_taps_data)
+    {% if HAS_DATA_VALIDITY %}
+    , .taps_data_v_o(delay_taps_data_v)
+    {% endif %}
+);
+
+{{MULTIPLIER_LAYER_MODULE_NAME}}_multiplier_layer
+i_multiplier_layer
+(
+    {% if HAS_ENABLE %}
+      .en_i     (en_i),
+    {% endif %}
+
+      .data_i   (multiplier_data_i)
+    {% if HAS_DATA_VALIDITY %}
+    , .data_v_i (delay_taps_data_v)
+    {% endif %}
+
+    , .data_o   (products)
+    {% if HAS_DATA_VALIDITY %}
+    , .data_v_o (products_v)
+    {% endif %}
+
+    {% if HAS_COEFFS_OUTPUT %}
+    , .coeffs_o (coeffs_o)
+    {% endif %}
+);
+
+{{ADDER_TREE_MODULE_NAME}}_adder_tree
+i_adder_tree
+(
+    {% if HAS_ENABLE %}
+      .layer_en_i(adder_layer_en),
+    {% endif %}
+
+      .data_i   (products)
+    {% if HAS_DATA_VALIDITY %}
+    , .data_v_i (products_v)
+    {% endif %}
+
+    {% for layer_ii in range(adder_layer_count) %}
+    , .data_layer_{{layer_ii}}_o  (adder_layer_{{layer_ii}}_data)
+        {% if HAS_DATA_VALIDITY %}
+    , .data_layer_{{layer_ii}}_v_o(adder_layer_{{layer_ii}}_data_v)
+        {% endif %}
+    {% endfor %}
+);
+
+assign data_o = adder_layer_{{adder_layer_count - 1}}_data[0];
+{% if HAS_DATA_VALIDITY %}
+assign data_v_o = adder_layer_{{adder_layer_count - 1}}_data_v[0];
+{% endif %}
+
+endmodule
+
+`endif // {{MODULE_NAME | upper}}_TOP

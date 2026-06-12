@@ -1,0 +1,6 @@
+[submodule "syn/pdks/45"]
+	path = syn/pdks/45
+	url = https://github.com/mflowgen/freepdk-45nm
+[submodule "syn/pdks/55"]
+	path = syn/pdks/55
+	url = https://github.com/openecos-projects/icsprout55-pdk

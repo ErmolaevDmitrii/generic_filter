@@ -1,0 +1,13 @@
+load("//tools/bazel:sv_rules.bzl", "sv_library")
+
+package(default_visibility = ["//visibility:public"])
+
+sv_library(
+    name = "rtl",
+    deps = [
+        "//src/commom/cell:rtl",
+        "//src/commom/delay_line:rtl",
+        "//src/commom/multiplier_layer:rtl",
+        "//src/commom/adder_tree:rtl",
+    ],
+)

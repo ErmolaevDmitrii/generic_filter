@@ -1,0 +1,6 @@
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "jinja2_utils",
+    srcs = glob(["*.j2"]),
+)

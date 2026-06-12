@@ -1,0 +1,17 @@
+load("//tools/bazel:sv_rules.bzl", "sv_filelist", "sv_library")
+
+package(default_visibility = ["//visibility:public"])
+
+sv_library(
+    name = "rtl",
+    deps = [
+        "//src/commom:rtl",
+        "//src/filters:rtl",
+    ],
+)
+
+sv_filelist(
+    name = "filelist",
+    deps = [":rtl"],
+    out = "rtl.f",
+)

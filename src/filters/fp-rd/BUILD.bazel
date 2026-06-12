@@ -1,0 +1,36 @@
+load("//tools/bazel:sv_rules.bzl", "sv_jinja_inline_template", "sv_library")
+
+package(default_visibility = ["//visibility:public"])
+
+BASE_CONFIG = {
+    "MODULE_NAME": "generic_fp_rd",
+    "DELAY_LINE_MODULE_NAME": "generic_delay_line",
+    "MULTIPLIER_LAYER_MODULE_NAME": "generic",
+    "ADDER_TREE_MODULE_NAME": "generic",
+    "TAPS_COUNT": "8",
+    "INPUT_DATA_WIDTH": "16",
+    "COEFFS_WIDTH": "16",
+    "MUL_OUTPUT_DATA_WIDTH": "32",
+    "HAS_RESET": "true",
+    "HAS_ENABLE": "true",
+    "HAS_DATA_VALIDITY": "true",
+    "HAS_COEFFS_OUTPUT": "true",
+}
+
+sv_jinja_inline_template(
+    name = "generic_fp_rd_top",
+    template = "top.sv.j2",
+    config = BASE_CONFIG,
+    deps = [
+        "//tools/jinja2:jinja2_utils",
+        "//src/commom/delay_line:rtl",
+        "//src/commom/multiplier_layer:rtl",
+        "//src/commom/adder_tree:rtl",
+    ],
+    out = "generic_fp_rd.sv",
+)
+
+sv_library(
+    name = "rtl",
+    deps = [":generic_fp_rd_top"],
+)

@@ -1,0 +1,105 @@
+{% from "tools/jinja2/rtl_header.j2" import rtl_header %}
+{% from "tools/jinja2/parameters_dump.j2" import parameters_dump %}
+
+{{ parameters_dump(ctx) }}
+
+{{ rtl_header(
+    module_name = MODULE_NAME ~ "_top",
+    description = "Top module for parametrized delay line block",
+    authors     = "Dmitrii Ermolaev"
+) }}
+
+{{ jinja_warning("TODO: Implement parameter check") }}
+
+`ifndef {{MODULE_NAME | upper}}_TOP
+
+`define {{MODULE_NAME | upper}}_TOP
+
+module {{MODULE_NAME}}
+#(
+    localparam int unsigned DATA_WIDTH = {{ DATA_WIDTH }},
+    localparam int unsigned TAPS_COUNT = {{ TAPS_COUNT }}
+)
+(
+      input logic clk
+    {% if HAS_RESET %}
+    , input logic rst_n
+    {% endif %}
+    {% if HAS_ENABLE %}
+    , input logic en_i
+    {% endif %}
+
+    , input logic [DATA_WIDTH - 1:0] data_i
+    {% if HAS_DATA_VALIDITY %}
+    , input logic                    data_v_i
+    {% endif %}
+
+    {% if HAS_BYPASS %}
+    , input logic [TAPS_COUNT - 1:0] bypass_i
+    {% endif %}
+
+    , output logic [DATA_WIDTH - 1:0] data_o
+    {% if HAS_DATA_VALIDITY %}
+    , output logic                    data_v_o
+    {% endif %}
+
+    {% if HAS_TAP_OUTPUTS %}
+    , output logic [DATA_WIDTH - 1:0] taps_data_o   [TAPS_COUNT]
+        {% if HAS_DATA_VALIDITY %}
+    , output logic                    taps_data_v_o [TAPS_COUNT]
+        {% endif %}
+    {% endif %}
+);
+
+logic [DATA_WIDTH - 1:0] data_bus   [TAPS_COUNT:0];
+{% if HAS_DATA_VALIDITY %}
+logic                    data_v_bus [TAPS_COUNT:0];
+{% endif %}
+
+assign data_bus  [0] = data_i;
+{% if HAS_DATA_VALIDITY %}
+assign data_v_bus[0] = data_v_i;
+{% endif %}
+
+{% for i in range(TAPS_COUNT) %}
+{{MODULE_NAME}}_line_cell i_delay_cell_{{i}}
+(
+      .clk     (clk)
+    {% if HAS_RESET %}
+    , .rst_n   (rst_n)
+    {% endif %}
+    {% if HAS_ENABLE %}
+    , .en_i    (en_i)
+    {% endif%}
+
+    , .data_i  (data_bus  [{{i}}])
+    {% if HAS_DATA_VALIDITY %}
+    , .data_v_i(data_v_bus[{{i}}])
+    {% endif %}
+
+    {% if HAS_BYPASS %}
+    , .bypass_i(bypass_i[{{i}}])
+    {% endif %}
+
+    , .data_o  (data_bus  [{{i + 1}}])
+    {% if HAS_DATA_VALIDITY %}
+    , .data_v_o(data_v_bus[{{i + 1}}])
+    {% endif %}
+);
+
+{% if HAS_TAP_OUTPUTS %}
+assign taps_data_o  [{{i}}] = data_bus  [{{i}}];
+    {% if HAS_DATA_VALIDITY %}
+assign taps_data_v_o[{{i}}] = data_v_bus[{{i}}];
+    {% endif %}
+{% endif %}
+{% endfor %}
+
+assign data_o   = data_bus  [TAPS_COUNT];
+{% if HAS_DATA_VALIDITY %}
+assign data_v_o = data_v_bus[TAPS_COUNT];
+{% endif %}
+
+endmodule
+
+`endif // {{MODULE_NAME | upper}}_TOP

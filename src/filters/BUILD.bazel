@@ -1,0 +1,10 @@
+load("//tools/bazel:sv_rules.bzl", "sv_library")
+
+package(default_visibility = ["//visibility:public"])
+
+sv_library(
+    name = "rtl",
+    deps = [
+        "//src/filters/fp-rd:rtl",
+    ],
+)

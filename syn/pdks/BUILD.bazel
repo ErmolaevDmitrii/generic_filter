@@ -1,0 +1,37 @@
+load("//syn/pdks:ics55_tt_files.bzl", "ICS55_TT_FILES")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files([
+    "ics55_tt_files.bzl",
+])
+
+filegroup(
+    name = "ics55_tt_liberty",
+    srcs = ICS55_TT_FILES.liberty,
+)
+
+filegroup(
+    name = "ics55_tt_lefs",
+    srcs = ICS55_TT_FILES.lefs,
+)
+
+filegroup(
+    name = "ics55_tt_verilog_models",
+    srcs = ICS55_TT_FILES.verilog_models,
+)
+
+filegroup(
+    name = "ics55_tt_cdl_netlists",
+    srcs = ICS55_TT_FILES.cdl_netlists,
+)
+
+filegroup(
+    name = "ics55_tt_gds",
+    srcs = ICS55_TT_FILES.gds,
+)
+
+filegroup(
+    name = "ics55_tt_all_files",
+    srcs = ICS55_TT_FILES.all_files,
+)

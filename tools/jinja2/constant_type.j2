@@ -1,0 +1,18 @@
+{% macro const_type_prefix(const_type, is_signed=False) -%}
+    {%- set prefixes = {
+        'dec': "'d",
+        'hex': "'h",
+        'oct': "'o",
+        'bin': "'b"
+    } -%}
+
+    {{- jinja_assert(const_type in prefixes, "Unsupported format_type: '" ~ const_type ~ "'. Expected 'dec', 'hex', 'oct' or 'bin'.") -}}
+
+    {%- set prefix = prefixes.get(const_type) -%}
+
+    {%- if is_signed -%}
+        {{- prefix[0] ~ 's' ~ prefix[1] -}}
+    {%- else -%}
+        {{- prefix -}}
+    {%- endif -%}
+{%- endmacro %}

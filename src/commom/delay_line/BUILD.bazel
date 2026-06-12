@@ -1,0 +1,38 @@
+load("//tools/bazel:sv_rules.bzl", "sv_jinja_inline_template", "sv_library")
+
+package(default_visibility = ["//visibility:public"])
+
+BASE_CONFIG = {
+    "MODULE_NAME": "generic_delay_line",
+    "DATA_WIDTH": "16",
+    "TAPS_COUNT": "8",
+    "HAS_RESET": "true",
+    "HAS_ENABLE": "true",
+    "HAS_DATA_VALIDITY": "true",
+    "HAS_BYPASS": "true",
+    "HAS_TAP_OUTPUTS": "true",
+}
+
+sv_jinja_inline_template(
+    name = "generic_delay_line_cell",
+    template = "src/cell.sv.j2",
+    config = BASE_CONFIG,
+    deps = ["//tools/jinja2:jinja2_utils"],
+    out = "generic_delay_line_cell.sv",
+)
+
+sv_jinja_inline_template(
+    name = "generic_delay_line_top",
+    template = "src/top.sv.j2",
+    config = BASE_CONFIG,
+    deps = ["//tools/jinja2:jinja2_utils"],
+    out = "generic_delay_line.sv",
+)
+
+sv_library(
+    name = "rtl",
+    deps = [
+        ":generic_delay_line_cell",
+        ":generic_delay_line_top",
+    ],
+)
