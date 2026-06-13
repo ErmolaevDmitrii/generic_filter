@@ -5,9 +5,9 @@ package(default_visibility = ["//visibility:public"])
 sv_library(
     name = "rtl",
     deps = [
-        "//src/commom/cell:rtl",
-        "//src/commom/delay_line:rtl",
-        "//src/commom/multiplier_layer:rtl",
-        "//src/commom/adder_tree:rtl",
+        "//src/common/cell:rtl",
+        "//src/common/delay_line:rtl",
+        "//src/common/multiplier_layer:rtl",
+        "//src/common/adder_tree:rtl",
     ],
 )
