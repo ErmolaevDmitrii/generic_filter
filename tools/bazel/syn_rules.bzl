@@ -20,9 +20,6 @@ def _pdk_dest(file):
 def _script_dest(file):
     return "scripts/genus/" + file.basename
 
-def _manifest_dest(file):
-    return "manifest/" + file.basename
-
 def _genus_package_impl(ctx):
     rtl_infos = [dep[SvInfo] for dep in ctx.attr.rtl_deps if SvInfo in dep]
     rtl_srcs = depset(transitive = [info.srcs for info in rtl_infos], order = "postorder").to_list()
@@ -72,13 +69,20 @@ def _genus_package_impl(ctx):
         "  ./scripts/genus/run_genus.sh",
         "",
     ]
+    design_tcl_lines = [
+        "set GENUS_PACKAGE_TOP {%s}" % ctx.attr.top_module,
+        "set GENUS_PACKAGE_CORNER {%s}" % ctx.attr.corner,
+        "",
+    ]
 
     rtl_filelist = ctx.actions.declare_file(ctx.label.name + "_rtl.f")
     pdk_tcl = ctx.actions.declare_file(ctx.label.name + "_pdk_tt.tcl")
+    design_tcl = ctx.actions.declare_file(ctx.label.name + "_design.tcl")
     package_txt = ctx.actions.declare_file(ctx.label.name + "_README.txt")
 
     ctx.actions.write(rtl_filelist, "\n".join(rtl_lines) + "\n")
     ctx.actions.write(pdk_tcl, "\n".join(pdk_tcl_lines) + "\n")
+    ctx.actions.write(design_tcl, "\n".join(design_tcl_lines))
     ctx.actions.write(package_txt, "\n".join(package_lines))
 
     copies = []
@@ -92,9 +96,15 @@ def _genus_package_impl(ctx):
     for f in script_files:
         inputs.append(f)
         copies.extend([f.path, _script_dest(f)])
-    for f in [rtl_filelist, pdk_tcl, package_txt]:
+    manifest_files = [
+        (rtl_filelist, "manifest/rtl.f"),
+        (pdk_tcl, "manifest/pdk.tcl"),
+        (design_tcl, "manifest/design.tcl"),
+        (package_txt, "manifest/README.txt"),
+    ]
+    for f, dest in manifest_files:
         inputs.append(f)
-        copies.extend([f.path, _manifest_dest(f)])
+        copies.extend([f.path, dest])
 
     out = ctx.outputs.out
     args = ctx.actions.args()
@@ -125,7 +135,15 @@ rm -rf "$tmp"
         mnemonic = "GenusPackage",
     )
 
-    return [DefaultInfo(files = depset([out]))]
+    return [
+        DefaultInfo(files = depset([
+            out,
+            rtl_filelist,
+            pdk_tcl,
+            design_tcl,
+            package_txt,
+        ])),
+    ]
 
 genus_package = rule(
     implementation = _genus_package_impl,
