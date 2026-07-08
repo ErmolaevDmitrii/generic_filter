@@ -7,7 +7,7 @@ BASE_CONFIG = {
     "MODULE_ID": "generic",
     "DATA_WIDTH": "16",
     "COEFF_WIDTH": "16",
-    "COEFFS_COUNT": "8",
+    "COEFFS_COUNT": "16",
     "MUL_DATA_WIDTH": "32",
     "COEFF_DEFAULT_VALUE": "0",
     "CELL_RESET_EN": "true",

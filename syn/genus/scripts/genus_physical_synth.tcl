@@ -5,12 +5,6 @@ if {[info exists ::env(GENUS_RUN_ROOT)]} {
     set package_root [file normalize [file join $script_dir ../..]]
 }
 
-if {[info exists ::env(GENUS_TOP)]} {
-    set top_module $::env(GENUS_TOP)
-} else {
-    set top_module generic_fp_rd
-}
-
 if {[info exists ::env(GENUS_CLOCK_PERIOD_NS)]} {
     set clock_period_ns $::env(GENUS_CLOCK_PERIOD_NS)
 } else {
@@ -23,9 +17,13 @@ if {[info exists ::env(GENUS_IO_DELAY_NS)]} {
     set io_delay_ns 1.0
 }
 
-set rtl_filelist [file join $package_root manifest fp_rd_tt_package_rtl.f]
-set pdk_manifest [file join $package_root manifest fp_rd_tt_package_pdk_tt.tcl]
+set design_manifest [file join $package_root manifest design.tcl]
+set rtl_filelist [file join $package_root manifest rtl.f]
+set pdk_manifest [file join $package_root manifest pdk.tcl]
 
+if {![file exists $design_manifest]} {
+    error "Design manifest not found: $design_manifest"
+}
 if {![file exists $rtl_filelist]} {
     error "RTL filelist not found: $rtl_filelist"
 }
@@ -33,7 +31,14 @@ if {![file exists $pdk_manifest]} {
     error "PDK manifest not found: $pdk_manifest"
 }
 
+source $design_manifest
 source $pdk_manifest
+
+if {[info exists ::env(GENUS_TOP)]} {
+    set top_module $::env(GENUS_TOP)
+} else {
+    set top_module $GENUS_PACKAGE_TOP
+}
 
 set report_dir [file join $package_root reports]
 set output_dir [file join $package_root outputs]
@@ -98,6 +103,8 @@ if {![catch {set rst_ports [get_ports rst_n]}] && [sizeof_collection $rst_ports]
     set_false_path -from $rst_ports
 }
 
+set_db auto_ungroup none
+
 check_design -unresolved > [file join $report_dir check_design_unresolved.rpt]
 
 syn_generic
@@ -105,6 +112,7 @@ syn_map
 syn_opt
 
 report_area > [file join $report_dir area.rpt]
+report_area -depth 99 > [file join $report_dir area_hier.rpt]
 report_gates > [file join $report_dir gates.rpt]
 report_power > [file join $report_dir power.rpt]
 report_timing > [file join $report_dir timing.rpt]

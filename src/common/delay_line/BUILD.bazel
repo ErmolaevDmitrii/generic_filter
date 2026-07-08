@@ -5,11 +5,11 @@ package(default_visibility = ["//visibility:public"])
 BASE_CONFIG = {
     "MODULE_NAME": "generic_delay_line",
     "DATA_WIDTH": "16",
-    "TAPS_COUNT": "8",
-    "HAS_RESET": "true",
+    "TAPS_COUNT": "16",
+    "HAS_RESET": "false",
     "HAS_ENABLE": "true",
     "HAS_DATA_VALIDITY": "true",
-    "HAS_BYPASS": "true",
+    "HAS_BYPASS": "false",
     "HAS_TAP_OUTPUTS": "true",
 }
 

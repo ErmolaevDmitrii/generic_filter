@@ -5,6 +5,10 @@ package(default_visibility = ["//visibility:public"])
 sv_library(
     name = "rtl",
     deps = [
+        "//src/filters/fa-rd:rtl",
+        "//src/filters/fd-rd:rtl",
         "//src/filters/fp-rd:rtl",
+        "//src/filters/ht-rd:rtl",
+        "//src/filters/sm-rd:rtl",
     ],
 )

@@ -4,14 +4,14 @@ package(default_visibility = ["//visibility:public"])
 
 BASE_CONFIG = {
     "MODULE_NAME": "generic",
-    "INPUT_COUNT": "8",
+    "INPUT_COUNT": "16",
     "DATA_WIDTH": "32",
     "FIXED_LAYER_DATA_WIDTH": "false",
     "ADDER_MODE": "COMB",
     "HAS_RESET": "false",
     "HAS_ENABLE": "true",
     "HAS_DATA_VALIDITY": "true",
-    "START_OUTPUT_LAYER": "1",
+    "START_OUTPUT_LAYER": "4",
     "TARGET": "VERIFICATION",
     "CUSTOM_EN": "false",
 }

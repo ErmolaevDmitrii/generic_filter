@@ -1,4 +1,5 @@
 load("//tools/bazel:syn_rules.bzl", "genus_package")
+load("//tools/bazel:package_rules.bzl", "package_bundle")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -36,4 +37,129 @@ genus_package(
         ":genus_scripts",
     ],
     out = "fp_rd_tt_genus_pkg.tar.gz",
+)
+
+genus_package(
+    name = "fd_rd_tt_package",
+    corner = "tt",
+    top_module = "generic_fd_rd",
+    rtl_deps = [
+        "//src/filters/fd-rd:rtl",
+    ],
+    liberty = [
+        "//syn/pdks:ics55_tt_liberty",
+    ],
+    lefs = [
+        "//syn/pdks:ics55_tt_lefs",
+    ],
+    verilog_models = [
+        "//syn/pdks:ics55_tt_verilog_models",
+    ],
+    cdl_netlists = [
+        "//syn/pdks:ics55_tt_cdl_netlists",
+    ],
+    gds = [
+        "//syn/pdks:ics55_tt_gds",
+    ],
+    scripts = [
+        ":genus_scripts",
+    ],
+    out = "fd_rd_tt_genus_pkg.tar.gz",
+)
+
+genus_package(
+    name = "fa_rd_tt_package",
+    corner = "tt",
+    top_module = "generic_fa_rd",
+    rtl_deps = [
+        "//src/filters/fa-rd:rtl",
+    ],
+    liberty = [
+        "//syn/pdks:ics55_tt_liberty",
+    ],
+    lefs = [
+        "//syn/pdks:ics55_tt_lefs",
+    ],
+    verilog_models = [
+        "//syn/pdks:ics55_tt_verilog_models",
+    ],
+    cdl_netlists = [
+        "//syn/pdks:ics55_tt_cdl_netlists",
+    ],
+    gds = [
+        "//syn/pdks:ics55_tt_gds",
+    ],
+    scripts = [
+        ":genus_scripts",
+    ],
+    out = "fa_rd_tt_genus_pkg.tar.gz",
+)
+
+genus_package(
+    name = "ht_rd_tt_package",
+    corner = "tt",
+    top_module = "generic_ht_rd",
+    rtl_deps = [
+        "//src/filters/ht-rd:rtl",
+    ],
+    liberty = [
+        "//syn/pdks:ics55_tt_liberty",
+    ],
+    lefs = [
+        "//syn/pdks:ics55_tt_lefs",
+    ],
+    verilog_models = [
+        "//syn/pdks:ics55_tt_verilog_models",
+    ],
+    cdl_netlists = [
+        "//syn/pdks:ics55_tt_cdl_netlists",
+    ],
+    gds = [
+        "//syn/pdks:ics55_tt_gds",
+    ],
+    scripts = [
+        ":genus_scripts",
+    ],
+    out = "ht_rd_tt_genus_pkg.tar.gz",
+)
+
+genus_package(
+    name = "sm_rd_tt_package",
+    corner = "tt",
+    top_module = "generic_sm_rd",
+    rtl_deps = [
+        "//src/filters/sm-rd:rtl",
+    ],
+    liberty = [
+        "//syn/pdks:ics55_tt_liberty",
+    ],
+    lefs = [
+        "//syn/pdks:ics55_tt_lefs",
+    ],
+    verilog_models = [
+        "//syn/pdks:ics55_tt_verilog_models",
+    ],
+    cdl_netlists = [
+        "//syn/pdks:ics55_tt_cdl_netlists",
+    ],
+    gds = [
+        "//syn/pdks:ics55_tt_gds",
+    ],
+    scripts = [
+        ":genus_scripts",
+    ],
+    out = "sm_rd_tt_genus_pkg.tar.gz",
+)
+
+package_bundle(
+    name = "all_filters_package",
+    description = "ASIC synthesis packages for all filter architectures.",
+    packages = {
+        ":fa_rd_tt_package": "fa-rd",
+        ":fd_rd_tt_package": "fd-rd",
+        ":fp_rd_tt_package": "fp-rd",
+        ":ht_rd_tt_package": "ht-rd",
+        ":sm_rd_tt_package": "sm-rd",
+    },
+    out = "all_filters_asic_synthesis.tar.gz",
 )

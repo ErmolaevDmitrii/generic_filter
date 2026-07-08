@@ -9,6 +9,8 @@
     authors     = "Dmitrii Ermolaev"
 ) }}
 
+{% set register_outputs = REGISTER_OUTPUTS if REGISTER_OUTPUTS is defined else false %}
+
 `ifndef {{MODULE_NAME | upper}}_MULTIPLIER_LAYER
 
 `define {{MODULE_NAME | upper}}_MULTIPLIER_LAYER
@@ -16,7 +18,7 @@
 module {{MODULE_NAME}}_multiplier_layer
   import {{MODULE_NAME}}_multiplier_layer_pkg::*;
 (
-    {% if MUL_MODE == "PIPELINED" or COEFF_TYPE == "DYNAMIC" %}
+    {% if MUL_MODE == "PIPELINED" or COEFF_TYPE == "DYNAMIC" or register_outputs %}
       input logic clk,
         {% if HAS_RESET %}
       input logic rst_n,
@@ -41,6 +43,10 @@ module {{MODULE_NAME}}_multiplier_layer
         {% endif %}
     {% endif %}
 
+    {% if COEFF_TYPE == "EXTERNAL" %}
+    , input logic signed [COEFFS_WIDTH - 1:0] coeffs_i [TAPS_COUNT]
+    {% endif %}
+
     {% if HAS_COEFFS_OPTIONS %}
         {% for i in range(COEFFS_OPTIONS_COUNT) %}
     , input logic signed [COEFFS_WIDTH - 1:0] coeffs_option_{{i}}_i [TAPS_COUNT]
@@ -59,7 +65,15 @@ module {{MODULE_NAME}}_multiplier_layer
 );
 
 logic signed [COEFFS_WIDTH - 1:0] selected_coeffs [TAPS_COUNT];
+{% if COEFF_TYPE != "EXTERNAL" %}
 logic signed [COEFFS_WIDTH - 1:0] internal_coeffs [TAPS_COUNT];
+{% endif %}
+{% if register_outputs %}
+logic signed [OUTPUT_DATA_WIDTH - 1:0] multiplier_results   [TAPS_COUNT];
+    {% if HAS_DATA_VALIDITY %}
+logic                                  multiplier_results_v [TAPS_COUNT];
+    {% endif %}
+{% endif %}
 
 {% if HAS_COEFFS_OPTIONS %}
 {{MODULE_NAME}}_coeffs_selector
@@ -72,10 +86,13 @@ i_coeffs_selector
       .coeffs_sel_i(coeff_sel_i)
     , .coeffs_o    (selected_coeffs)
 );
+{% elif COEFF_TYPE == "EXTERNAL" %}
+assign selected_coeffs = coeffs_i;
 {% else %}
 assign selected_coeffs = internal_coeffs;
 {% endif %}
 
+{% if COEFF_TYPE != "EXTERNAL" %}
 {{MODULE_NAME}}_register_file
 i_register_file
 (
@@ -99,9 +116,14 @@ i_register_file
 
       .coeffs_o(internal_coeffs)
 );
+{% endif %}
 
 {% if HAS_COEFFS_OUTPUT %}
+    {% if COEFF_TYPE == "EXTERNAL" %}
+assign coeffs_o = coeffs_i;
+    {% else %}
 assign coeffs_o = internal_coeffs;
+    {% endif %}
 {% endif %}
 
 {% for i in range(TAPS_COUNT) %}
@@ -127,11 +149,31 @@ i_multiplier_{{i}}
     , .operand_2_v_i(1'b1)
     {% endif %}
 
-    , .result_o  (data_o  [{{i}}])
+    , .result_o  ({{"multiplier_results" if register_outputs else "data_o"}}  [{{i}}])
     {% if HAS_DATA_VALIDITY %}
-    , .result_v_o(data_v_o[{{i}}])
+    , .result_v_o({{"multiplier_results_v" if register_outputs else "data_v_o"}}[{{i}}])
     {% endif %}
 );
+
+{% if register_outputs %}
+always_ff @(posedge clk {{-" or negedge rst_n" if HAS_RESET else ""}}) begin
+    {% if HAS_RESET %}
+    if (~rst_n) begin
+        data_o[{{i}}] <= '0;
+        {% if HAS_DATA_VALIDITY %}
+        data_v_o[{{i}}] <= 1'b0;
+        {% endif %}
+    end
+    else
+    {% endif %}
+    if ({{"en_i" if HAS_ENABLE else "1'b1"}}) begin
+        data_o[{{i}}] <= multiplier_results[{{i}}];
+    end
+    {% if HAS_DATA_VALIDITY %}
+    data_v_o[{{i}}] <= multiplier_results_v[{{i}}];
+    {% endif %}
+end
+{% endif %}
 
 {% endfor %}
 

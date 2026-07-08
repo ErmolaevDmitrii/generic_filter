@@ -46,9 +46,9 @@
 
 module {{MODULE_NAME}}_adder_tree
 #(
-    localparam int unsigned INPUT_COUNT  = {{ INPUT_COUNT             }},
-    localparam int unsigned DATA_WIDTH   = {{ DATA_WIDTH              }},
-    localparam int unsigned LAYER_COUNT  = {{ layers_info.layer_count }}
+    parameter int unsigned INPUT_COUNT  = {{ INPUT_COUNT             }},
+    parameter int unsigned DATA_WIDTH   = {{ DATA_WIDTH              }},
+    parameter int unsigned LAYER_COUNT  = {{ layers_info.layer_count }}
 )
 (
     {% if ADDER_MODE == "PIPELINED" %}

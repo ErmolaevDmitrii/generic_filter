@@ -25,6 +25,9 @@
 {{ jinja_assert(COEFFS_WIDTH is integer, "COEFFS_WIDTH is not integer"      ) }}
 {{ jinja_assert(COEFFS_WIDTH > 0       , "COEFFS_WIDTH must be 1 or greater") }}
 
+{{ jinja_assert(COEFF_TYPE is defined, "COEFF_TYPE is not defined") }}
+{{ jinja_assert(COEFF_TYPE in ["CONSTANT", "DYNAMIC", "EXTERNAL"], "COEFF_TYPE must be CONSTANT, DYNAMIC or EXTERNAL") }}
+
 {% set output_data_width = OUTPUT_DATA_WIDTH if OUTPUT_DATA_WIDTH is defined else 0 %}
 {% if output_data_width != 0 %}
     {{ jinja_assert(output_data_width is integer, "OUTPUT_DATA_WIDTH must be integer"     ) }}

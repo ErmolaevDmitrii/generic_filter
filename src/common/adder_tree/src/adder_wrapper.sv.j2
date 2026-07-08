@@ -65,8 +65,22 @@ assign result_v_o = {{" en_i & " if HAS_ENABLE else "" -}} operand_1_v_i & opera
         {% endif %}
     {% endif %}
 {% elif TARGET == "FPGA" %}
+    {% if CUSTOM_EN %}
 
-{{ jinja_assert(False, "TODO: Implement me") }}
+    {{ jinja_assert(False, "TODO: Implement me") }}
+
+    {% else %}
+        {% if ADDER_MODE == "COMB" %}
+assign result_o   = (OUTPUT_WIDTH)'(operand_1_i) + (OUTPUT_WIDTH)'(operand_2_i);
+            {% if HAS_DATA_VALIDITY %}
+assign result_v_o = {{" en_i & " if HAS_ENABLE else "" -}} operand_1_v_i & operand_2_v_i;
+            {% endif %}
+        {% elif ADDER_MODE == "PIPELINED"%}
+
+        {{ jinja_assert(False, "TODO: Implement me") }}
+
+        {% endif %}
+    {% endif %}
 
 {% elif TARGET == "ASIC" %}
     {% if CUSTOM_EN %}

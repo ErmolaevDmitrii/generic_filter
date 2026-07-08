@@ -32,7 +32,7 @@ module {{MODULE_ID}}_filter_cell
     , parameter int unsigned COEFF_WIDTH      = {{ COEFF_WIDTH    }}
 {%  if CELL_EXT_COEFFS_EN %}
     , parameter int unsigned COEFFS_COUNT     = {{ COEFFS_COUNT   }}
-    , localparam int unsigned COEFF_SEL_WIDTH  = COEFFS_COUNT + 1
+    , parameter int unsigned COEFF_SEL_WIDTH   = COEFFS_COUNT + 1
 {%  endif %}
 {% endif %}
 {% if CELL_MULTIPLY_OUTPUT_EN %}

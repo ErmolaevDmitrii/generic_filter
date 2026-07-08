@@ -5,37 +5,31 @@
 
 {{ rtl_header(
     module_name = MODULE_NAME,
-    description = "Top module for fp-rd FIR filter design",
+    description = "Full-parallel reconfigurable FIR filter built from common RTL blocks",
     authors     = "Dmitrii Ermolaev"
 ) }}
 
-{{ jinja_assert(TAPS_COUNT is defined, "TAPS_COUNT is not defined") }}
-{{ jinja_assert(TAPS_COUNT is integer, "TAPS_COUNT must be integer") }}
-{{ jinja_assert(TAPS_COUNT > 0, "TAPS_COUNT must be 1 or greater") }}
+{{ jinja_assert(TAPS_COUNT is integer and TAPS_COUNT >= 4, "TAPS_COUNT must be at least 4") }}
 {{ jinja_assert(TAPS_COUNT == 2 ** (TAPS_COUNT | clog2), "TAPS_COUNT must be a power of two") }}
 
-{{ jinja_assert(INPUT_DATA_WIDTH is defined, "INPUT_DATA_WIDTH is not defined") }}
-{{ jinja_assert(INPUT_DATA_WIDTH is integer, "INPUT_DATA_WIDTH must be integer") }}
-{{ jinja_assert(INPUT_DATA_WIDTH > 0, "INPUT_DATA_WIDTH must be 1 or greater") }}
-
-{{ jinja_assert(MUL_OUTPUT_DATA_WIDTH is defined, "MUL_OUTPUT_DATA_WIDTH is not defined") }}
-{{ jinja_assert(MUL_OUTPUT_DATA_WIDTH is integer, "MUL_OUTPUT_DATA_WIDTH must be integer") }}
-{{ jinja_assert(MUL_OUTPUT_DATA_WIDTH > 0, "MUL_OUTPUT_DATA_WIDTH must be 1 or greater") }}
-
-{% set adder_layer_count = TAPS_COUNT | clog2 %}
-{% set output_data_width = MUL_OUTPUT_DATA_WIDTH + adder_layer_count %}
+{% set half_taps = TAPS_COUNT // 2 %}
+{% set half_layers = half_taps | clog2 %}
+{% set coeffs_index_width = TAPS_COUNT | clog2 %}
+{% set half_sum_width = MUL_OUTPUT_DATA_WIDTH + half_layers %}
+{% set output_data_width = half_sum_width + 1 %}
 
 `ifndef {{MODULE_NAME | upper}}_TOP
-
 `define {{MODULE_NAME | upper}}_TOP
 
 module {{MODULE_NAME}}
 #(
-    localparam int unsigned TAPS_COUNT            = {{ TAPS_COUNT }},
-    localparam int unsigned INPUT_DATA_WIDTH      = {{ INPUT_DATA_WIDTH }},
-    localparam int unsigned COEFFS_WIDTH          = {{ COEFFS_WIDTH }},
-    localparam int unsigned MUL_OUTPUT_DATA_WIDTH = {{ MUL_OUTPUT_DATA_WIDTH }},
-    localparam int unsigned OUTPUT_DATA_WIDTH     = {{ output_data_width }}
+    parameter int unsigned TAPS_COUNT            = {{TAPS_COUNT}},
+    parameter int unsigned HALF_TAPS             = {{half_taps}},
+    parameter int unsigned INPUT_DATA_WIDTH      = {{INPUT_DATA_WIDTH}},
+    parameter int unsigned COEFFS_WIDTH          = {{COEFFS_WIDTH}},
+    parameter int unsigned COEFFS_INDEX_WIDTH    = {{coeffs_index_width}},
+    parameter int unsigned MUL_OUTPUT_DATA_WIDTH = {{MUL_OUTPUT_DATA_WIDTH}},
+    parameter int unsigned OUTPUT_DATA_WIDTH     = {{output_data_width}}
 )
 (
       input logic clk
@@ -45,125 +39,198 @@ module {{MODULE_NAME}}
     {% if HAS_ENABLE %}
     , input logic en_i
     {% endif %}
-
+    , input logic short_mode_i
     , input logic signed [INPUT_DATA_WIDTH - 1:0] data_i
     {% if HAS_DATA_VALIDITY %}
-    , input logic                                 data_v_i
+    , input logic data_v_i
     {% endif %}
-
+    , input logic        [COEFFS_INDEX_WIDTH - 1:0] coeff_update_index_i
+    , input logic signed [COEFFS_WIDTH - 1:0]       coeff_update_data_i
+    , input logic                                    coeff_update_v_i
     , output logic signed [OUTPUT_DATA_WIDTH - 1:0] data_o
     {% if HAS_DATA_VALIDITY %}
-    , output logic                                      data_v_o
+    , output logic data_v_o
     {% endif %}
-
     {% if HAS_COEFFS_OUTPUT %}
     , output logic signed [COEFFS_WIDTH - 1:0] coeffs_o [TAPS_COUNT]
     {% endif %}
 );
 
-logic [INPUT_DATA_WIDTH - 1:0] delay_taps_data   [TAPS_COUNT];
-{% if HAS_DATA_VALIDITY %}
-logic                          delay_taps_data_v [TAPS_COUNT];
-{% endif %}
+logic upper_path_en;
+logic lower_path_en;
+logic [{{half_layers - 1}}:0] coeff_update_local_index;
+logic upper_coeff_update_v;
+logic lower_coeff_update_v;
 
-logic signed [INPUT_DATA_WIDTH - 1:0] multiplier_data_i [TAPS_COUNT];
-logic signed [MUL_OUTPUT_DATA_WIDTH - 1:0] products     [TAPS_COUNT];
-{% if HAS_DATA_VALIDITY %}
-logic                                      products_v   [TAPS_COUNT];
-{% endif %}
+logic [INPUT_DATA_WIDTH - 1:0] upper_taps [HALF_TAPS];
+logic [INPUT_DATA_WIDTH - 1:0] lower_taps [HALF_TAPS];
+logic upper_taps_v [HALF_TAPS];
+logic lower_taps_v [HALF_TAPS];
+logic [INPUT_DATA_WIDTH - 1:0] upper_delay_data;
+logic [INPUT_DATA_WIDTH - 1:0] lower_delay_data_unused;
+logic upper_delay_data_v;
+logic lower_delay_data_v_unused;
 
-logic adder_layer_en [{{adder_layer_count}}];
+logic signed [INPUT_DATA_WIDTH - 1:0] upper_multiplier_data [HALF_TAPS];
+logic signed [INPUT_DATA_WIDTH - 1:0] lower_multiplier_data [HALF_TAPS];
+logic signed [MUL_OUTPUT_DATA_WIDTH - 1:0] upper_products [HALF_TAPS];
+logic signed [MUL_OUTPUT_DATA_WIDTH - 1:0] lower_products [HALF_TAPS];
+logic upper_products_v [HALF_TAPS];
+logic lower_products_v [HALF_TAPS];
 
-{% for layer_ii in range(adder_layer_count) %}
-logic signed [{{MUL_OUTPUT_DATA_WIDTH + layer_ii}}:0] adder_layer_{{layer_ii}}_data   [{{2 ** (adder_layer_count - layer_ii - 1)}}];
-{% if HAS_DATA_VALIDITY %}
-logic                                                adder_layer_{{layer_ii}}_data_v [{{2 ** (adder_layer_count - layer_ii - 1)}}];
-{% endif %}
+logic upper_adder_en [{{half_layers}}];
+logic lower_adder_en [{{half_layers}}];
+logic signed [{{half_sum_width - 1}}:0] upper_sum [1];
+logic signed [{{half_sum_width - 1}}:0] lower_sum [1];
+logic upper_sum_v [1];
+logic lower_sum_v [1];
+logic signed [{{output_data_width - 1}}:0] full_sum;
+logic full_sum_v;
+logic [{{half_layers}}:0] lower_fill_count_ff;
+logic lower_history_ready;
+logic result_short_mode_ff;
+
+assign upper_path_en = {{"en_i" if HAS_ENABLE else "1'b1"}};
+assign lower_path_en = upper_path_en & ~short_mode_i;
+assign coeff_update_local_index = coeff_update_index_i[{{half_layers - 1}}:0];
+assign upper_coeff_update_v =
+    coeff_update_v_i & ~coeff_update_index_i[COEFFS_INDEX_WIDTH - 1];
+assign lower_coeff_update_v =
+    coeff_update_v_i & coeff_update_index_i[COEFFS_INDEX_WIDTH - 1];
+assign lower_history_ready =
+    (lower_fill_count_ff >= {{half_layers + 1}}'({{half_taps - 1}}))
+    & upper_delay_data_v;
+
+{% for i in range(half_taps) %}
+assign upper_multiplier_data[{{i}}] = upper_taps[{{i}}];
+assign lower_multiplier_data[{{i}}] = lower_taps[{{i}}];
 {% endfor %}
 
-{% for i in range(TAPS_COUNT) %}
-assign multiplier_data_i[{{i}}] = delay_taps_data[{{i}}];
+{% for i in range(half_layers) %}
+assign upper_adder_en[{{i}}] = upper_path_en;
+assign lower_adder_en[{{i}}] = lower_path_en;
 {% endfor %}
 
-{% for layer_ii in range(adder_layer_count) %}
-assign adder_layer_en[{{layer_ii}}] = {{"en_i" if HAS_ENABLE else "1'b1"}};
-{% endfor %}
-
-{{DELAY_LINE_MODULE_NAME}}
-i_delay_line
+{{DELAY_LINE_MODULE_NAME}} i_upper_delay_line
 (
-      .clk          (clk)
+      .clk(clk)
+    {% if DELAY_LINE_HAS_RESET %}
+    , .rst_n(rst_n)
+    {% endif %}
+    , .en_i(upper_path_en)
+    , .data_i(data_i)
+    , .data_v_i(data_v_i)
+    , .data_o(upper_delay_data)
+    , .data_v_o(upper_delay_data_v)
+    , .taps_data_o(upper_taps)
+    , .taps_data_v_o(upper_taps_v)
+);
+
+{{DELAY_LINE_MODULE_NAME}} i_lower_delay_line
+(
+      .clk(clk)
+    {% if DELAY_LINE_HAS_RESET %}
+    , .rst_n(rst_n)
+    {% endif %}
+    , .en_i(lower_path_en)
+    , .data_i(upper_delay_data)
+    , .data_v_i(upper_delay_data_v)
+    , .data_o(lower_delay_data_unused)
+    , .data_v_o(lower_delay_data_v_unused)
+    , .taps_data_o(lower_taps)
+    , .taps_data_v_o(lower_taps_v)
+);
+
+{{MULTIPLIER_LAYER_MODULE_NAME}}_multiplier_layer i_upper_multiplier_layer
+(
+      .clk(clk)
+    , .en_i(upper_path_en)
+    , .data_i(upper_multiplier_data)
+    , .data_v_i(upper_taps_v)
+    , .coeff_update_index_i(coeff_update_local_index)
+    , .coeff_update_data_i(coeff_update_data_i)
+    , .coeff_update_v_i(upper_coeff_update_v)
+    , .data_o(upper_products)
+    , .data_v_o(upper_products_v)
+);
+
+{{MULTIPLIER_LAYER_MODULE_NAME}}_multiplier_layer i_lower_multiplier_layer
+(
+      .clk(clk)
+    , .en_i(lower_path_en)
+    , .data_i(lower_multiplier_data)
+    , .data_v_i(lower_taps_v)
+    , .coeff_update_index_i(coeff_update_local_index)
+    , .coeff_update_data_i(coeff_update_data_i)
+    , .coeff_update_v_i(lower_coeff_update_v)
+    , .data_o(lower_products)
+    , .data_v_o(lower_products_v)
+);
+
+{{ADDER_TREE_MODULE_NAME}}_adder_tree i_upper_adder_tree
+(
+      .layer_en_i(upper_adder_en)
+    , .data_i(upper_products)
+    , .data_v_i(upper_products_v)
+    , .data_layer_{{half_layers - 1}}_o(upper_sum)
+    , .data_layer_{{half_layers - 1}}_v_o(upper_sum_v)
+);
+
+{{ADDER_TREE_MODULE_NAME}}_adder_tree i_lower_adder_tree
+(
+      .layer_en_i(lower_adder_en)
+    , .data_i(lower_products)
+    , .data_v_i(lower_products_v)
+    , .data_layer_{{half_layers - 1}}_o(lower_sum)
+    , .data_layer_{{half_layers - 1}}_v_o(lower_sum_v)
+);
+
+{{ADDER_TREE_MODULE_NAME}}_adder_wrapper #(
+    .INPUT_WIDTH({{half_sum_width}}),
+    .OUTPUT_WIDTH({{output_data_width}})
+) i_final_adder (
+      .en_i(lower_path_en)
+    , .operand_1_i(upper_sum[0])
+    , .operand_1_v_i(upper_sum_v[0])
+    , .operand_2_i(lower_sum[0])
+    , .operand_2_v_i(lower_sum_v[0])
+    , .result_o(full_sum)
+    , .result_v_o(full_sum_v)
+);
+
+always_ff @(posedge clk {{-" or negedge rst_n" if HAS_RESET else ""}}) begin
     {% if HAS_RESET %}
-    , .rst_n        (rst_n)
+    if (~rst_n) begin
+        lower_fill_count_ff <= '0;
+        result_short_mode_ff <= 1'b1;
+    end
+    else
     {% endif %}
-    {% if HAS_ENABLE %}
-    , .en_i         (en_i)
-    {% endif %}
+    if (upper_path_en) begin
+        result_short_mode_ff <= short_mode_i;
+        if (short_mode_i) begin
+            lower_fill_count_ff <= '0;
+        end
+        else if (upper_delay_data_v
+                 && lower_fill_count_ff < {{half_layers + 1}}'({{half_taps - 1}})) begin
+            lower_fill_count_ff <= lower_fill_count_ff + 1'b1;
+        end
+    end
+end
 
-    , .data_i       (data_i)
+always_comb begin
+    data_o = OUTPUT_DATA_WIDTH'(upper_sum[0]);
     {% if HAS_DATA_VALIDITY %}
-    , .data_v_i     (data_v_i)
+    data_v_o = upper_sum_v[0];
     {% endif %}
 
-    , .bypass_i     ('0)
-
-    , .data_o       ()
-    {% if HAS_DATA_VALIDITY %}
-    , .data_v_o     ()
-    {% endif %}
-
-    , .taps_data_o  (delay_taps_data)
-    {% if HAS_DATA_VALIDITY %}
-    , .taps_data_v_o(delay_taps_data_v)
-    {% endif %}
-);
-
-{{MULTIPLIER_LAYER_MODULE_NAME}}_multiplier_layer
-i_multiplier_layer
-(
-    {% if HAS_ENABLE %}
-      .en_i     (en_i),
-    {% endif %}
-
-      .data_i   (multiplier_data_i)
-    {% if HAS_DATA_VALIDITY %}
-    , .data_v_i (delay_taps_data_v)
-    {% endif %}
-
-    , .data_o   (products)
-    {% if HAS_DATA_VALIDITY %}
-    , .data_v_o (products_v)
-    {% endif %}
-
-    {% if HAS_COEFFS_OUTPUT %}
-    , .coeffs_o (coeffs_o)
-    {% endif %}
-);
-
-{{ADDER_TREE_MODULE_NAME}}_adder_tree
-i_adder_tree
-(
-    {% if HAS_ENABLE %}
-      .layer_en_i(adder_layer_en),
-    {% endif %}
-
-      .data_i   (products)
-    {% if HAS_DATA_VALIDITY %}
-    , .data_v_i (products_v)
-    {% endif %}
-
-    {% for layer_ii in range(adder_layer_count) %}
-    , .data_layer_{{layer_ii}}_o  (adder_layer_{{layer_ii}}_data)
+    if (~result_short_mode_ff) begin
+        data_o = full_sum;
         {% if HAS_DATA_VALIDITY %}
-    , .data_layer_{{layer_ii}}_v_o(adder_layer_{{layer_ii}}_data_v)
+        data_v_o = full_sum_v & lower_history_ready;
         {% endif %}
-    {% endfor %}
-);
-
-assign data_o = adder_layer_{{adder_layer_count - 1}}_data[0];
-{% if HAS_DATA_VALIDITY %}
-assign data_v_o = adder_layer_{{adder_layer_count - 1}}_data_v[0];
-{% endif %}
+    end
+end
 
 endmodule
 
