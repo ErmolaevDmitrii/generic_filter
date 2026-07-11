@@ -1,0 +1,16 @@
+{
+  "MODULE_NAME": "generic_fp_rd",
+  "DELAY_LINE_MODULE_NAME": "fp_rd_delay",
+  "REGISTER_FILE_MODULE_NAME": "fp_rd_compute",
+  "MULTIPLIER_LAYER_MODULE_NAME": "fp_rd_compute",
+  "ADDER_TREE_MODULE_NAME": "fp_rd_sum",
+  "TAPS_COUNT": 16,
+  "INPUT_DATA_WIDTH": 16,
+  "COEFFS_WIDTH": 16,
+  "MUL_OUTPUT_DATA_WIDTH": 32,
+  "HAS_RESET": true,
+  "DELAY_LINE_HAS_RESET": false,
+  "HAS_ENABLE": true,
+  "HAS_DATA_VALIDITY": true,
+  "HAS_COEFFS_OUTPUT": false
+}
