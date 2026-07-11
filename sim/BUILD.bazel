@@ -1,0 +1,26 @@
+load("//tools/bazel:sim_rules.bzl", "vcs_sim_package")
+
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "fir_model",
+    srcs = ["fir_model.py"],
+)
+
+exports_files([
+    "README.md",
+    "fp_rd_chirp_tb.sv",
+    "run_vcs.sh",
+])
+
+vcs_sim_package(
+    name = "fp_rd_vcs_package",
+    top_module = "generic_fp_rd",
+    sim_top = "fp_rd_chirp_tb",
+    rtl_deps = ["//src/filters/fp-rd:rtl"],
+    rtl_strip_prefix = "src/filters/fp-rd/",
+    testbench = ["fp_rd_chirp_tb.sv"],
+    model = "fir_model.py",
+    scripts = ["run_vcs.sh"],
+    out = "fp_rd_vcs_sim.tar.gz",
+)
