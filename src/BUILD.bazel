@@ -1,13 +1,14 @@
-load("//tools/bazel:sv_rules.bzl", "sv_filelist", "sv_library")
+load("@hdl_rules//filelist:defs.bzl", "verilog_filelist")
+load("@hdl_rules//verilog:defs.bzl", "verilog_library")
 
 package(default_visibility = ["//visibility:public"])
 
-sv_library(
+verilog_library(
     name = "rtl",
     deps = ["//src/filters:rtl"],
 )
 
-sv_filelist(
+verilog_filelist(
     name = "filelist",
     deps = [":rtl"],
     out = "rtl.f",

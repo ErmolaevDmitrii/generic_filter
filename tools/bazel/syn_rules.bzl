@@ -1,4 +1,4 @@
-load("//tools/bazel:sv_rules.bzl", "SvInfo")
+load("@hdl_rules//verilog:defs.bzl", "VerilogContext")
 
 def _strip_prefix(path, prefix):
     if path.startswith(prefix):
@@ -21,7 +21,7 @@ def _script_dest(file):
     return "scripts/genus/" + file.basename
 
 def _genus_package_impl(ctx):
-    rtl_infos = [dep[SvInfo] for dep in ctx.attr.rtl_deps if SvInfo in dep]
+    rtl_infos = [dep[VerilogContext] for dep in ctx.attr.rtl_deps if VerilogContext in dep]
     rtl_srcs = depset(transitive = [info.srcs for info in rtl_infos], order = "postorder").to_list()
 
     liberty_files = ctx.files.liberty
@@ -148,7 +148,7 @@ rm -rf "$tmp"
 genus_package = rule(
     implementation = _genus_package_impl,
     attrs = {
-        "rtl_deps": attr.label_list(mandatory = True, providers = [SvInfo]),
+        "rtl_deps": attr.label_list(mandatory = True, providers = [VerilogContext]),
         "liberty": attr.label_list(allow_files = [".lib"]),
         "lefs": attr.label_list(allow_files = [".lef"]),
         "verilog_models": attr.label_list(allow_files = [".v"]),

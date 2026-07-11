@@ -1,8 +1,8 @@
-load("//tools/bazel:sv_rules.bzl", "sv_library")
+load("@hdl_rules//verilog:defs.bzl", "verilog_library")
 
 package(default_visibility = ["//visibility:public"])
 
-sv_library(
+verilog_library(
     name = "rtl",
     deps = ["//src/filters/fp-rd:rtl"],
 )

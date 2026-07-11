@@ -1,27 +1,11 @@
 load("@adder_tree//:defs.bzl", "adder_tree")
 load("@delay_line//:defs.bzl", "delay_line")
+load("@hdl_rules//jinja2:defs.bzl", "verilog_jinja2_render")
+load("@hdl_rules//verilog:defs.bzl", "verilog_library")
 load("@multiplier_layer//:defs.bzl", "multiplier_layer")
 load("@register_file//:defs.bzl", "register_file")
-load("//tools/bazel:sv_rules.bzl", "sv_jinja_inline_template", "sv_library")
 
 package(default_visibility = ["//visibility:public"])
-
-TOP_CONFIG = {
-    "MODULE_NAME": "generic_fp_rd",
-    "DELAY_LINE_MODULE_NAME": "fp_rd_delay",
-    "REGISTER_FILE_MODULE_NAME": "fp_rd_compute",
-    "MULTIPLIER_LAYER_MODULE_NAME": "fp_rd_compute",
-    "ADDER_TREE_MODULE_NAME": "fp_rd_sum",
-    "TAPS_COUNT": "16",
-    "INPUT_DATA_WIDTH": "16",
-    "COEFFS_WIDTH": "16",
-    "MUL_OUTPUT_DATA_WIDTH": "32",
-    "HAS_RESET": "true",
-    "DELAY_LINE_HAS_RESET": "false",
-    "HAS_ENABLE": "true",
-    "HAS_DATA_VALIDITY": "true",
-    "HAS_COEFFS_OUTPUT": "false",
-}
 
 DELAY_CONFIG = {
     "MODULE_NAME": "fp_rd_delay",
@@ -97,21 +81,20 @@ adder_tree(
     params = ADDER_CONFIG,
 )
 
-sv_jinja_inline_template(
+verilog_jinja2_render(
     name = "generic_fp_rd_top",
     template = "top.sv.j2",
-    config = TOP_CONFIG,
+    params_file = "config/params.json",
     deps = [
         ":adder_tree_library",
         ":delay_line_library",
         ":multiplier_layer_library",
         ":register_file_library",
-        "//tools/jinja2:jinja2_utils",
     ],
     out = "generic_fp_rd.sv",
 )
 
-sv_library(
+verilog_library(
     name = "rtl",
     deps = [":generic_fp_rd_top"],
 )
@@ -126,21 +109,20 @@ adder_tree(
     params = dict(ADDER_CONFIG, TARGET = "FPGA"),
 )
 
-sv_jinja_inline_template(
+verilog_jinja2_render(
     name = "fpga_top",
     template = "top.sv.j2",
-    config = TOP_CONFIG,
+    params_file = "config/params.json",
     deps = [
         ":delay_line_library",
         ":fpga_adder_tree_library",
         ":fpga_multiplier_layer_library",
         ":register_file_library",
-        "//tools/jinja2:jinja2_utils",
     ],
     out = "fpga/generic_fp_rd.sv",
 )
 
-sv_library(
+verilog_library(
     name = "fpga_rtl",
     deps = [":fpga_top"],
 )
