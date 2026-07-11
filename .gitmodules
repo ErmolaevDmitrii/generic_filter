@@ -4,3 +4,15 @@
 [submodule "syn/pdks/55"]
 	path = syn/pdks/55
 	url = https://github.com/openecos-projects/icsprout55-pdk
+[submodule "lib/adder_tree"]
+	path = lib/adder_tree
+	url = git@github.com:ErmolaevDmitrii/adder_tree.git
+[submodule "lib/delay_line"]
+	path = lib/delay_line
+	url = git@github.com:ErmolaevDmitrii/delay_line.git
+[submodule "lib/register_file"]
+	path = lib/register_file
+	url = git@github.com:ErmolaevDmitrii/register_file.git
+[submodule "lib/multiplier_layer"]
+	path = lib/multiplier_layer
+	url = git@github.com:ErmolaevDmitrii/multiplier_layer.git
