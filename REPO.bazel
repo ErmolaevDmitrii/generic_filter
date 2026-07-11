@@ -1,0 +1,6 @@
+ignore_directories([
+    "lib/adder_tree",
+    "lib/delay_line",
+    "lib/multiplier_layer",
+    "lib/register_file",
+])
