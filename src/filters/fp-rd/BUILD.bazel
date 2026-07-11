@@ -1,11 +1,15 @@
+load("@adder_tree//:defs.bzl", "adder_tree")
+load("@delay_line//:defs.bzl", "delay_line")
+load("@multiplier_layer//:defs.bzl", "multiplier_layer")
+load("@register_file//:defs.bzl", "register_file")
 load("//tools/bazel:sv_rules.bzl", "sv_jinja_inline_template", "sv_library")
-load("//tools/bazel:fpga_filter_rules.bzl", "fpga_filter_rtl")
 
 package(default_visibility = ["//visibility:public"])
 
 TOP_CONFIG = {
     "MODULE_NAME": "generic_fp_rd",
     "DELAY_LINE_MODULE_NAME": "fp_rd_delay",
+    "REGISTER_FILE_MODULE_NAME": "fp_rd_compute",
     "MULTIPLIER_LAYER_MODULE_NAME": "fp_rd_compute",
     "ADDER_TREE_MODULE_NAME": "fp_rd_sum",
     "TAPS_COUNT": "16",
@@ -21,130 +25,76 @@ TOP_CONFIG = {
 
 DELAY_CONFIG = {
     "MODULE_NAME": "fp_rd_delay",
-    "DATA_WIDTH": "16",
-    "TAPS_COUNT": "8",
-    "HAS_RESET": "false",
-    "HAS_ENABLE": "true",
-    "HAS_DATA_VALIDITY": "true",
-    "HAS_BYPASS": "false",
-    "HAS_TAP_OUTPUTS": "true",
+    "DATA_WIDTH": 16,
+    "TAPS_COUNT": 8,
+    "HAS_RESET": False,
+    "HAS_ENABLE": True,
+    "HAS_DATA_VALIDITY": True,
+    "HAS_BYPASS": False,
+    "HAS_TAP_OUTPUTS": True,
+}
+
+REGISTER_FILE_CONFIG = {
+    "MODULE_NAME": "fp_rd_compute",
+    "TAPS_COUNT": 8,
+    "COEFFS_WIDTH": 16,
+    "COEFF_TYPE": "DYNAMIC",
+    "COEFFS_DEFAULT_VALUES": [0, 0, 0, 0, 0, 0, 0, 0],
+    "COEFFS_CONST_TYPE": "dec",
+    "COEFFS_CONST_TYPE_IS_SIGNED": True,
+    "HAS_RESET": False,
+    "HAS_ENABLE": True,
+    "HAS_SHADOW_REGISTERS": False,
+    "COEFFS_OPTIONS_COUNT": 0,
 }
 
 MULTIPLIER_CONFIG = {
     "MODULE_NAME": "fp_rd_compute",
-    "TAPS_COUNT": "8",
-    "INPUT_DATA_WIDTH": "16",
-    "COEFFS_WIDTH": "16",
-    "OUTPUT_DATA_WIDTH": "32",
+    "TAPS_COUNT": 8,
+    "INPUT_DATA_WIDTH": 16,
+    "COEFFS_WIDTH": 16,
+    "OUTPUT_DATA_WIDTH": 32,
     "MUL_MODE": "COMB",
-    "REGISTER_OUTPUTS": "true",
-    "COEFF_TYPE": "DYNAMIC",
-    "COEFFS_CONST_TYPE": "dec",
-    "COEFFS_CONST_TYPE_IS_SIGNED": "true",
-    "HAS_RESET": "false",
-    "HAS_ENABLE": "true",
-    "HAS_DATA_VALIDITY": "true",
-    "HAS_SHADOW_REGISTERS": "false",
-    "HAS_COEFFS_OPTIONS": "false",
-    "COEFFS_OPTIONS_COUNT": "0",
-    "HAS_COEFFS_OUTPUT": "false",
-    "CUSTOM_EN": "false",
+    "HAS_REGISTER_OUTPUTS": True,
+    "HAS_RESET": False,
+    "HAS_ENABLE": True,
+    "HAS_DATA_VALIDITY": True,
+    "CUSTOM_EN": False,
     "TARGET": "VERIFICATION",
 }
 
 ADDER_CONFIG = {
     "MODULE_NAME": "fp_rd_sum",
-    "INPUT_COUNT": "8",
-    "DATA_WIDTH": "32",
-    "FIXED_LAYER_DATA_WIDTH": "false",
+    "INPUT_COUNT": 8,
+    "DATA_WIDTH": 32,
+    "FIXED_LAYER_DATA_WIDTH": False,
     "ADDER_MODE": "COMB",
-    "HAS_RESET": "false",
-    "HAS_ENABLE": "true",
-    "HAS_DATA_VALIDITY": "true",
-    "START_OUTPUT_LAYER": "3",
+    "HAS_RESET": False,
+    "HAS_ENABLE": True,
+    "HAS_DATA_VALIDITY": True,
+    "START_OUTPUT_LAYER": 3,
     "TARGET": "VERIFICATION",
-    "CUSTOM_EN": "false",
+    "CUSTOM_EN": False,
 }
 
-sv_jinja_inline_template(
-    name = "delay_cell",
-    template = "//src/common/delay_line:src/cell.sv.j2",
-    config = DELAY_CONFIG,
-    deps = ["//tools/jinja2:jinja2_utils"],
-    out = "fp_rd_delay_line_cell.sv",
-)
-
-sv_jinja_inline_template(
+delay_line(
     name = "delay_line",
-    template = "//src/common/delay_line:src/top.sv.j2",
-    config = DELAY_CONFIG,
-    deps = [
-        ":delay_cell",
-        "//tools/jinja2:jinja2_utils",
-    ],
-    out = "fp_rd_delay.sv",
+    params = DELAY_CONFIG,
 )
 
-sv_jinja_inline_template(
-    name = "multiplier_pkg",
-    template = "//src/common/multiplier_layer:src/multiplier_layer_pkg.sv.j2",
-    config = MULTIPLIER_CONFIG,
-    deps = ["//tools/jinja2:jinja2_utils"],
-    out = "fp_rd_compute_multiplier_layer_pkg.sv",
+register_file(
+    name = "register_file",
+    params = REGISTER_FILE_CONFIG,
 )
 
-sv_jinja_inline_template(
-    name = "multiplier_register_file",
-    template = "//src/common/multiplier_layer:src/register_file.sv.j2",
-    config = MULTIPLIER_CONFIG,
-    deps = [
-        ":multiplier_pkg",
-        "//tools/jinja2:jinja2_utils",
-    ],
-    out = "fp_rd_compute_register_file.sv",
-)
-
-sv_jinja_inline_template(
-    name = "multiplier_wrapper",
-    template = "//src/common/multiplier_layer:src/multiplier_wrapper.sv.j2",
-    config = MULTIPLIER_CONFIG,
-    deps = [
-        ":multiplier_pkg",
-        "//tools/jinja2:jinja2_utils",
-    ],
-    out = "fp_rd_compute_multiplier_wrapper.sv",
-)
-
-sv_jinja_inline_template(
+multiplier_layer(
     name = "multiplier_layer",
-    template = "//src/common/multiplier_layer:src/multiplier_layer.sv.j2",
-    config = MULTIPLIER_CONFIG,
-    deps = [
-        ":multiplier_pkg",
-        ":multiplier_register_file",
-        ":multiplier_wrapper",
-        "//tools/jinja2:jinja2_utils",
-    ],
-    out = "fp_rd_compute_multiplier_layer.sv",
+    params = MULTIPLIER_CONFIG,
 )
 
-sv_jinja_inline_template(
-    name = "adder_wrapper",
-    template = "//src/common/adder_tree:src/adder_wrapper.sv.j2",
-    config = ADDER_CONFIG,
-    deps = ["//tools/jinja2:jinja2_utils"],
-    out = "fp_rd_sum_adder_wrapper.sv",
-)
-
-sv_jinja_inline_template(
+adder_tree(
     name = "adder_tree",
-    template = "//src/common/adder_tree:src/adder_tree.sv.j2",
-    config = ADDER_CONFIG,
-    deps = [
-        ":adder_wrapper",
-        "//tools/jinja2:jinja2_utils",
-    ],
-    out = "fp_rd_sum_adder_tree.sv",
+    params = ADDER_CONFIG,
 )
 
 sv_jinja_inline_template(
@@ -152,9 +102,10 @@ sv_jinja_inline_template(
     template = "top.sv.j2",
     config = TOP_CONFIG,
     deps = [
-        ":adder_tree",
-        ":delay_line",
-        ":multiplier_layer",
+        ":adder_tree_library",
+        ":delay_line_library",
+        ":multiplier_layer_library",
+        ":register_file_library",
         "//tools/jinja2:jinja2_utils",
     ],
     out = "generic_fp_rd.sv",
@@ -165,12 +116,31 @@ sv_library(
     deps = [":generic_fp_rd_top"],
 )
 
-fpga_filter_rtl(
-    top_template = "top.sv.j2",
-    top_config = TOP_CONFIG,
-    multiplier_config = MULTIPLIER_CONFIG,
-    adder_config = ADDER_CONFIG,
-    multiplier_pkg = ":multiplier_pkg",
-    multiplier_deps = [":multiplier_register_file"],
-    top_deps = [":delay_line"],
+multiplier_layer(
+    name = "fpga_multiplier_layer",
+    params = dict(MULTIPLIER_CONFIG, TARGET = "FPGA"),
+)
+
+adder_tree(
+    name = "fpga_adder_tree",
+    params = dict(ADDER_CONFIG, TARGET = "FPGA"),
+)
+
+sv_jinja_inline_template(
+    name = "fpga_top",
+    template = "top.sv.j2",
+    config = TOP_CONFIG,
+    deps = [
+        ":delay_line_library",
+        ":fpga_adder_tree_library",
+        ":fpga_multiplier_layer_library",
+        ":register_file_library",
+        "//tools/jinja2:jinja2_utils",
+    ],
+    out = "fpga/generic_fp_rd.sv",
+)
+
+sv_library(
+    name = "fpga_rtl",
+    deps = [":fpga_top"],
 )

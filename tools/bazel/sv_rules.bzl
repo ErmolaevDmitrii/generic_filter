@@ -1,11 +1,6 @@
-SvInfo = provider(
-    doc = "SystemVerilog sources and metadata for downstream EDA filelists.",
-    fields = {
-        "srcs": "Depset of .sv/.v/.svh/.vh files in dependency order.",
-        "incdirs": "Depset of include directories.",
-        "defines": "Depset of preprocessor defines.",
-    },
-)
+load("@hdl_rules//verilog:defs.bzl", "VerilogContext")
+
+SvInfo = VerilogContext
 
 def _merge_sv_info(ctx, direct_srcs = [], direct_incdirs = [], direct_defines = []):
     dep_infos = [dep[SvInfo] for dep in ctx.attr.deps if SvInfo in dep]

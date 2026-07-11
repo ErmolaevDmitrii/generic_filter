@@ -1,1 +1,38 @@
+module(
+    name = "generic_filter",
+    version = "0.1.0",
+)
+
+bazel_dep(name = "adder_tree", version = "0.1.0")
+bazel_dep(name = "delay_line", version = "0.1.0")
+bazel_dep(name = "multiplier_layer", version = "0.1.0")
+bazel_dep(name = "register_file", version = "0.1.0")
+
+bazel_dep(name = "hdl_rules", version = "0.1.0")
 bazel_dep(name = "rules_python", version = "1.7.0")
+
+local_path_override(
+    module_name = "adder_tree",
+    path = "lib/adder_tree",
+)
+
+local_path_override(
+    module_name = "delay_line",
+    path = "lib/delay_line",
+)
+
+local_path_override(
+    module_name = "multiplier_layer",
+    path = "lib/multiplier_layer",
+)
+
+local_path_override(
+    module_name = "register_file",
+    path = "lib/register_file",
+)
+
+git_override(
+    module_name = "hdl_rules",
+    remote = "https://github.com/ErmolaevDmitrii/hdl_rules",
+    branch = "main",
+)

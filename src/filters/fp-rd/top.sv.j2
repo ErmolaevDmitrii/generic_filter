@@ -5,18 +5,18 @@
 
 {{ rtl_header(
     module_name = MODULE_NAME,
-    description = "Full-parallel reconfigurable FIR filter built from common RTL blocks",
+    description = "Full-parallel reconfigurable FIR filter built from reusable RTL libraries",
     authors     = "Dmitrii Ermolaev"
 ) }}
 
 {{ jinja_assert(TAPS_COUNT is integer and TAPS_COUNT >= 4, "TAPS_COUNT must be at least 4") }}
 {{ jinja_assert(TAPS_COUNT == 2 ** (TAPS_COUNT | clog2), "TAPS_COUNT must be a power of two") }}
 
-{% set half_taps = TAPS_COUNT // 2 %}
-{% set half_layers = half_taps | clog2 %}
+{% set half_taps          = TAPS_COUNT // 2 %}
+{% set half_layers        = half_taps | clog2 %}
 {% set coeffs_index_width = TAPS_COUNT | clog2 %}
-{% set half_sum_width = MUL_OUTPUT_DATA_WIDTH + half_layers %}
-{% set output_data_width = half_sum_width + 1 %}
+{% set half_sum_width     = MUL_OUTPUT_DATA_WIDTH + half_layers %}
+{% set output_data_width  = half_sum_width + 1 %}
 
 `ifndef {{MODULE_NAME | upper}}_TOP
 `define {{MODULE_NAME | upper}}_TOP
@@ -40,17 +40,21 @@ module {{MODULE_NAME}}
     , input logic en_i
     {% endif %}
     , input logic short_mode_i
+
     , input logic signed [INPUT_DATA_WIDTH - 1:0] data_i
     {% if HAS_DATA_VALIDITY %}
-    , input logic data_v_i
+    , input logic                                 data_v_i
     {% endif %}
+
     , input logic        [COEFFS_INDEX_WIDTH - 1:0] coeff_update_index_i
-    , input logic signed [COEFFS_WIDTH - 1:0]       coeff_update_data_i
-    , input logic                                    coeff_update_v_i
+    , input logic signed [COEFFS_WIDTH       - 1:0] coeff_update_data_i
+    , input logic                                   coeff_update_v_i
+
     , output logic signed [OUTPUT_DATA_WIDTH - 1:0] data_o
     {% if HAS_DATA_VALIDITY %}
     , output logic data_v_o
     {% endif %}
+
     {% if HAS_COEFFS_OUTPUT %}
     , output logic signed [COEFFS_WIDTH - 1:0] coeffs_o [TAPS_COUNT]
     {% endif %}
@@ -73,6 +77,8 @@ logic lower_delay_data_v_unused;
 
 logic signed [INPUT_DATA_WIDTH - 1:0] upper_multiplier_data [HALF_TAPS];
 logic signed [INPUT_DATA_WIDTH - 1:0] lower_multiplier_data [HALF_TAPS];
+logic signed [COEFFS_WIDTH - 1:0] upper_coeffs [HALF_TAPS];
+logic signed [COEFFS_WIDTH - 1:0] lower_coeffs [HALF_TAPS];
 logic signed [MUL_OUTPUT_DATA_WIDTH - 1:0] upper_products [HALF_TAPS];
 logic signed [MUL_OUTPUT_DATA_WIDTH - 1:0] lower_products [HALF_TAPS];
 logic upper_products_v [HALF_TAPS];
@@ -104,6 +110,10 @@ assign lower_history_ready =
 {% for i in range(half_taps) %}
 assign upper_multiplier_data[{{i}}] = upper_taps[{{i}}];
 assign lower_multiplier_data[{{i}}] = lower_taps[{{i}}];
+{% if HAS_COEFFS_OUTPUT %}
+assign coeffs_o[{{i}}] = upper_coeffs[{{i}}];
+assign coeffs_o[{{i + half_taps}}] = lower_coeffs[{{i}}];
+{% endif %}
 {% endfor %}
 
 {% for i in range(half_layers) %}
@@ -141,15 +151,33 @@ assign lower_adder_en[{{i}}] = lower_path_en;
     , .taps_data_v_o(lower_taps_v)
 );
 
+{{REGISTER_FILE_MODULE_NAME}}_register_file i_upper_register_file
+(
+      .clk(clk)
+    , .en_i(upper_path_en)
+    , .coeff_update_index_i(coeff_update_local_index)
+    , .coeff_update_data_i(coeff_update_data_i)
+    , .coeff_update_v_i(upper_coeff_update_v)
+    , .coeffs_o(upper_coeffs)
+);
+
+{{REGISTER_FILE_MODULE_NAME}}_register_file i_lower_register_file
+(
+      .clk(clk)
+    , .en_i(lower_path_en)
+    , .coeff_update_index_i(coeff_update_local_index)
+    , .coeff_update_data_i(coeff_update_data_i)
+    , .coeff_update_v_i(lower_coeff_update_v)
+    , .coeffs_o(lower_coeffs)
+);
+
 {{MULTIPLIER_LAYER_MODULE_NAME}}_multiplier_layer i_upper_multiplier_layer
 (
       .clk(clk)
     , .en_i(upper_path_en)
     , .data_i(upper_multiplier_data)
     , .data_v_i(upper_taps_v)
-    , .coeff_update_index_i(coeff_update_local_index)
-    , .coeff_update_data_i(coeff_update_data_i)
-    , .coeff_update_v_i(upper_coeff_update_v)
+    , .coeffs_i(upper_coeffs)
     , .data_o(upper_products)
     , .data_v_o(upper_products_v)
 );
@@ -160,9 +188,7 @@ assign lower_adder_en[{{i}}] = lower_path_en;
     , .en_i(lower_path_en)
     , .data_i(lower_multiplier_data)
     , .data_v_i(lower_taps_v)
-    , .coeff_update_index_i(coeff_update_local_index)
-    , .coeff_update_data_i(coeff_update_data_i)
-    , .coeff_update_v_i(lower_coeff_update_v)
+    , .coeffs_i(lower_coeffs)
     , .data_o(lower_products)
     , .data_v_o(lower_products_v)
 );
